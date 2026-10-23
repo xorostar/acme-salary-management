@@ -6,7 +6,8 @@ uses both. No test touches the network, the filesystem, or the real date.
 """
 
 from collections.abc import Iterator
-from datetime import date
+from dataclasses import dataclass
+from datetime import date, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -17,6 +18,8 @@ import app.models  # noqa: F401  (registers tables on Base.metadata)
 from app.config import Settings
 from app.db import Base, make_engine, make_session_factory
 from app.main import create_app
+from app.security import create_token
+from tests.factories import make_admin, make_org, make_viewer
 
 FIXED_TODAY = date(2025, 6, 15)
 
@@ -27,7 +30,7 @@ def fixed_clock() -> date:
 
 @pytest.fixture
 def settings() -> Settings:
-    return Settings(database_url="sqlite://", jwt_secret="test-secret", cors_origins=[])
+    return Settings(database_url="sqlite://", jwt_secret="test-secret-that-is-at-least-32-bytes-long!", cors_origins=[])
 
 
 @pytest.fixture
@@ -58,3 +61,42 @@ def app(settings: Settings, engine: Engine):
 def client(app) -> Iterator[TestClient]:
     with TestClient(app) as c:
         yield c
+
+
+@dataclass(frozen=True)
+class Seeded:
+    org_id: int
+    admin_id: int
+    viewer_id: int
+
+
+@pytest.fixture
+def seeded(session_factory: sessionmaker[Session]) -> Seeded:
+    """One organization with an admin and a viewer user, committed."""
+    with session_factory() as s:
+        org = make_org(s)
+        admin = make_admin(s, org)
+        viewer = make_viewer(s, org)
+        s.commit()
+        return Seeded(org_id=org.id, admin_id=admin.id, viewer_id=viewer.id)
+
+
+def _headers(settings: Settings, user_id: int, org_id: int, role: str) -> dict[str, str]:
+    token = create_token(
+        secret=settings.jwt_secret,
+        user_id=user_id,
+        organization_id=org_id,
+        role=role,
+        expires_in=timedelta(hours=1),
+    )
+    return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture
+def admin_headers(settings: Settings, seeded: Seeded) -> dict[str, str]:
+    return _headers(settings, seeded.admin_id, seeded.org_id, "hr_admin")
+
+
+@pytest.fixture
+def viewer_headers(settings: Settings, seeded: Seeded) -> dict[str, str]:
+    return _headers(settings, seeded.viewer_id, seeded.org_id, "hr_viewer")
