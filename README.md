@@ -24,6 +24,7 @@ monthly payroll runs.
 | [docs/ai-usage.md](docs/ai-usage.md) | How AI tools were used, the prompts, and what was caught and fixed by hand |
 | [docs/performance.md](docs/performance.md) | Measured timings on 10,000 employees and the trade-offs behind them |
 | [docs/deployment.md](docs/deployment.md) | Deploying the API to Fly.io and the web app to Vercel |
+| [docs/testing-guide.md](docs/testing-guide.md) | Feature-by-feature manual test script, expected results, smoke test |
 
 ## What the HR manager can do
 

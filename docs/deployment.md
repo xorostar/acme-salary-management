@@ -10,6 +10,59 @@ Two pieces, deployed separately (ADR 005):
 The container migrates and seeds on first boot, so a fresh deploy comes up with the 10,000
 employee demo organization and the two demo logins. A restart skips seeding.
 
+## Recommendation and reasoning
+
+```mermaid
+flowchart LR
+    R[Reviewer's browser] -->|HTTPS| V[Vercel<br/>Next.js web app<br/>CDN, free Hobby plan]
+    R -->|HTTPS JSON + Bearer token| F[Fly.io machine<br/>Docker: FastAPI + uvicorn]
+    F --> D[(Fly volume /data<br/>SQLite acme.db)]
+```
+
+**What actually has to run**
+
+| Component | Needs | Recommended | Rough cost |
+|---|---|---|---|
+| Web (Next.js) | A Node/Next host with a CDN | **Vercel**, made by the Next.js team, deploys from GitHub on every push | Free (Hobby) |
+| API (FastAPI) | Runs a Docker container 24/7 | **Fly.io**, one `shared-cpu-1x`, 512 MB machine | A few dollars a month (needs a card on file; check current pricing) |
+| Database (SQLite) | A **persistent disk** attached to the one API machine | **Fly volume**, 1 GB | Cents a month |
+| Secrets | JWT secret, demo password, allowed origin | `fly secrets` and Vercel env vars | Free |
+
+**Why this pair**
+
+- SQLite (ADR 005) needs a real disk and exactly one writer. Fly gives a volume pinned to one
+  machine, which fits that exactly. Most free hosts have ephemeral disks: the data would
+  reset on every restart, and reviewers might see edits vanish mid-review.
+- The API is already a verified Docker image, so Fly runs exactly what was tested locally.
+- Vercel needs no configuration for Next.js beyond the root folder and one variable.
+- No managed database to provision or pay for. One file holds all the data, and backup is
+  copying that file.
+
+**Settings that matter for reviewers**
+
+- `min_machines_running = 1` in `fly.toml` keeps the API warm. Without it, the first request
+  after idle waits a few seconds for the machine to boot. You can set it back to 0 after the
+  review to save money.
+- `primary_region`: `lhr` (London) is the default here. Pick the region closest to the
+  reviewers, e.g. `iad` for the US east coast or `sin` for Singapore, before first deploy. A
+  volume cannot move regions.
+- **Two settings must match exactly.** `NEXT_PUBLIC_API_URL` on Vercel must equal the Fly URL.
+  `ACME_CORS_ORIGINS` on Fly must equal the Vercel production URL, with `https://` and no
+  trailing slash. Most "login does nothing" problems are a CORS mismatch. Check the browser
+  console.
+- `NEXT_PUBLIC_API_URL` is baked in at **build** time. After changing it, redeploy on Vercel.
+- Vercel **preview** URLs (per-branch) differ from production and are not in the CORS list.
+  Test on the production URL.
+
+**Alternatives if you can't use Fly**
+
+| Option | Trade-off |
+|---|---|
+| Render web service + persistent disk | Same Dockerfile; the disk needs a paid instance. Free instances sleep and lose data. |
+| Railway with a volume | Same Dockerfile; trial credit, then usage-based. |
+| Any free host without a disk | Works, but re-seeds on every restart. Say so in the README. |
+| Everything on one VPS (Docker Compose) | Cheapest long term, but you manage TLS and updates. Not worth it for an assessment. |
+
 ## 1. API on Fly.io
 
 ```bash
