@@ -41,7 +41,7 @@ pip install -e ".[dev]"
 # PowerShell: $env:ACME_DATABASE_URL="postgresql://..."
 export ACME_DATABASE_URL="postgresql://..."
 alembic upgrade head
-python -m app.seed            # 10,000 employees; takes about a minute over the network
+python -m app.seed            # 10,000 employees; several minutes over the network (about 6 measured)
 ```
 
 ## 2. API on Vercel
