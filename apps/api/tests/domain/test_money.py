@@ -3,6 +3,7 @@ from decimal import Decimal
 import pytest
 
 from app.domain.money import (
+    RateConverter,
     convert_minor,
     exponent,
     format_money,
@@ -106,3 +107,36 @@ class TestFormat:
 
     def test_zero_decimals(self):
         assert format_money(4500000, "JPY") == "JPY 4,500,000"
+
+
+class TestRateConverter:
+    """The fast integer converter must agree with convert_minor exactly."""
+
+    CASES = [
+        ("GBP", "USD", "1.27"),
+        ("JPY", "USD", "0.0067"),
+        ("USD", "JPY", "149.25"),
+        ("INR", "USD", "0.0114"),
+        ("EUR", "USD", "1.08"),
+        ("BRL", "USD", "0.18"),
+    ]
+
+    @pytest.mark.parametrize("src,dst,rate", CASES)
+    def test_matches_decimal_conversion(self, src, dst, rate):
+        import random
+
+        rng = random.Random(7)
+        convert = RateConverter.build(src, dst, Decimal(rate))
+        amounts = [rng.randint(1, 10**10) for _ in range(2_000)] + [0, 1, 5, 50, 150]
+        for a in amounts:
+            assert convert(a) == convert_minor(a, src, dst, Decimal(rate)), a
+            assert convert(-a) == convert_minor(-a, src, dst, Decimal(rate)), -a
+
+    def test_exact_half_rounds_up(self):
+        # 1 cent * 0.5 = 0.5 cent -> 1 cent
+        assert RateConverter.build("USD", "USD", Decimal("0.5"))(1) == 1
+        assert RateConverter.build("USD", "USD", Decimal("0.5"))(-1) == -1
+
+    def test_rejects_non_positive_rate(self):
+        with pytest.raises(ValueError):
+            RateConverter.build("USD", "GBP", Decimal("0"))

@@ -5,6 +5,7 @@ from typing import Literal
 from sqlalchemy import Select, and_, func, or_, select
 from sqlalchemy.orm import Session
 
+from app.domain.analytics import PayRecord
 from app.models import Employee, SalaryEvent
 
 SortField = Literal[
@@ -157,20 +158,59 @@ class EmployeeRepository:
         sort: SortField = "last_name",
         descending: bool = False,
     ) -> list[EmployeeRow]:
-        amount = current_salary_subquery(as_of).label("current_amount")
-        effective = current_effective_date_subquery(as_of).label("current_effective")
-        stmt = apply_filters(select(Employee, amount, effective), org_id, filters, as_of)
-
+        # Two phases (a "deferred join"): pick the page of ids using only
+        # employee columns, then fetch rows and current salary for those ids.
+        # The correlated salary subqueries then run 25 times, not once per
+        # row skipped by OFFSET. Sorting by salary needs the subquery in phase 1.
         if sort == "current_salary":
-            order_col = amount
+            order_col = current_salary_subquery(as_of)
         else:
             order_col = getattr(Employee, sort)
         order = order_col.desc() if descending else order_col.asc()
-        # Tie-break on id so paging is stable.
-        stmt = stmt.order_by(order, Employee.id.asc())
-        stmt = stmt.offset((page - 1) * page_size).limit(page_size)
+        id_stmt = (
+            apply_filters(select(Employee.id), org_id, filters, as_of)
+            .order_by(order, Employee.id.asc())  # tie-break on id so paging is stable
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
+        ids = list(self.session.scalars(id_stmt))
+        if not ids:
+            return []
 
+        amount = current_salary_subquery(as_of).label("current_amount")
+        effective = current_effective_date_subquery(as_of).label("current_effective")
+        rows = {
+            emp.id: EmployeeRow(emp, amt, eff)
+            for emp, amt, eff in self.session.execute(
+                select(Employee, amount, effective).where(Employee.id.in_(ids))
+            )
+        }
+        return [rows[i] for i in ids]
+
+    def current_pay(self, org_id: int, filters: EmployeeFilters, as_of: date) -> list[PayRecord]:
+        """Salary in force on `as_of` for every matching employee, as plain records.
+
+        Employees with no salary event on or before `as_of` (hired in the
+        future) are skipped. One query with a correlated subquery that seeks
+        the (employee_id, effective_date) index once per employee. A grouped
+        join was measured as about twice as slow on SQLite, because the planner
+        builds a temporary index for it (docs/performance.md).
+        """
+        amount = current_salary_subquery(as_of).label("amount")
+        stmt = apply_filters(
+            select(
+                Employee.country_code,
+                Employee.department,
+                Employee.level,
+                Employee.currency_code,
+                amount,
+            ),
+            org_id,
+            filters,
+            as_of,
+        )
         return [
-            EmployeeRow(employee=emp, current_amount_minor=amt, current_effective_date=eff)
-            for emp, amt, eff in self.session.execute(stmt)
+            PayRecord(country, dept, level, currency, amt)
+            for country, dept, level, currency, amt in self.session.execute(stmt)
+            if amt is not None
         ]

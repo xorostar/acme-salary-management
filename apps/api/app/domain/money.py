@@ -4,6 +4,7 @@ See ADR 002. Every function takes and returns integers for amounts; the only
 non-integer type is Decimal for exchange rates and user-entered major amounts.
 """
 
+from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
 # Minor-unit exponent per ISO 4217 code for the currencies ACME pays in.
@@ -68,6 +69,33 @@ def convert_minor(amount_minor: int, from_currency: str, to_currency: str, rate:
     major = Decimal(amount_minor) / (Decimal(10) ** exponent(from_currency))
     target_major = major * rate
     return _round_half_up(target_major * (Decimal(10) ** exponent(to_currency)))
+
+
+@dataclass(frozen=True)
+class RateConverter:
+    """Exact conversion at one rate, precomputed for converting many amounts.
+
+    Same result as `convert_minor` (round half-up, away from zero), but in
+    integer arithmetic: the rate becomes an exact fraction once, so each
+    conversion is a multiply and a floor-divide instead of several Decimal
+    operations. Used where 10,000 salaries are converted per request.
+    """
+
+    numerator: int
+    denominator: int
+
+    @classmethod
+    def build(cls, from_currency: str, to_currency: str, rate: Decimal) -> "RateConverter":
+        if rate <= 0:
+            raise ValueError("Exchange rate must be positive")
+        num, den = rate.as_integer_ratio()
+        return cls(num * 10 ** exponent(to_currency), den * 10 ** exponent(from_currency))
+
+    def __call__(self, amount_minor: int) -> int:
+        # round_half_up(q / d) == floor((2q + d) / 2d) for q >= 0
+        q = abs(amount_minor) * self.numerator
+        rounded = (2 * q + self.denominator) // (2 * self.denominator)
+        return rounded if amount_minor >= 0 else -rounded
 
 
 def monthly_from_annual(annual_minor: int) -> int:
