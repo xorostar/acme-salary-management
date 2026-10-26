@@ -62,7 +62,7 @@ with a clear message when you entered something invalid.
 | 1.4 | Log in as admin correctly | Dashboard; header shows "Hana Admin" and an **HR admin** badge |
 | 1.5 | Reload the page | Still logged in |
 | 1.6 | Close the tab, open the app in a new tab | Asked to log in again; the session lasts only for the tab |
-| 1.7 | In dev tools → Application → Session Storage, change `acme.token` to `garbage`, then click Employees | Back on login with "Your session expired. Please sign in again." |
+| 1.7 | In dev tools → Application → Session Storage, change `acme.token` to `garbage`, then click Employees | Sent back to the login page. Usually with a "session expired" note. |
 | 1.8 | Click the log-out icon (top right) | Back on the login page |
 
 ---
@@ -218,7 +218,7 @@ NH001,Dup,Number,dup.nh@acme.example,US,USD,Sales,Account Executive,L2,2026-09-0
 | 9.7 | Save a CSV from Excel as "CSV UTF-8" | Accepted; Excel's byte-order mark is handled |
 | 9.8 | Upload a non-UTF-8 or binary file | "must be UTF-8 encoded CSV" |
 | 9.9 | Remove a column from the header | One error listing the missing columns |
-| 9.10 | **Big file:** export all (section 10), change every `AC` to `ZZ` and every `@acme.example` to `@new.example`, import | 10,000 rows validated in about 1 s and imported in a few seconds |
+| 9.10 | **Big file:** export the directory with the All tab (section 10), find and replace `AC` with `ZZ` (match case) and `@acme.example` with `@new.example`, import | All 10,000 rows validated in about a second and imported in a few seconds |
 
 ---
 
@@ -230,7 +230,7 @@ NH001,Dup,Number,dup.nh@acme.example,US,USD,Sales,Account Executive,L2,2026-09-0
 |---|---|---|
 | 10.1 | Directory, filter Japan, **Export CSV** | Downloads `acme-employees-{date}.csv` with only Japanese employees, salaries in yen, status and salary effective date |
 | 10.2 | Export with a search plus the Terminated tab | The file matches what is on screen, all pages included |
-| 10.3 | Add an employee whose last name is `=1+1` (section 6), export, open in Excel | The cell shows `'=1+1` as text, not 2. This is formula-injection protection. |
+| 10.3 | Add an employee whose last name is `=1+1` (section 6), export, open in Excel | The cell holds `'=1+1` as text and is not calculated to 2. This is formula-injection protection. |
 | 10.4 | Log in as viewer and export | Allowed; export is read-only |
 
 ---
@@ -274,7 +274,7 @@ nothing.
 
 ---
 
-## 13. API directly (optional, impresses reviewers)
+## 13. Using the API directly (optional)
 
 Open `http://localhost:8000/docs`, the interactive OpenAPI page.
 

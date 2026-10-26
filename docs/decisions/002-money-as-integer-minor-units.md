@@ -22,4 +22,4 @@ Salaries are stored in nine currencies, including JPY which has no fractional un
 ## Trade-offs accepted
 
 - Callers must know the exponent to display a value. A single `format_money` helper and the API's `currency_code` field keep this contained.
-- Percentile and mean calculations over minor units are done in SQL on integers, then rounded to whole minor units for display. Sub-unit precision on an aggregate is not meaningful for salaries.
+- Means and percentiles are computed on integer minor units after conversion to USD, then rounded half-up to a whole minor unit. Sub-unit precision on an aggregate is not meaningful for salaries.

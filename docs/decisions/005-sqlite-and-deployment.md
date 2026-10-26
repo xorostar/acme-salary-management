@@ -21,4 +21,4 @@ SQLite everywhere: in-memory for tests, a file for local development, and a file
 
 - A single API instance. Horizontal scaling would require moving to PostgreSQL. Documented, and the SQLAlchemy layer makes it a configuration change.
 - Fly.io volumes are tied to one region and one machine. Acceptable for the stated scale.
-- SQLite has no native `percentile` function. Percentiles are computed with a window function (`ROW_NUMBER` over ordered salaries) which is portable to PostgreSQL as well.
+- SQLite has no native `percentile` function. Salaries have to be converted to USD per currency first anyway, so percentiles are computed in Python on the converted integers (`app/domain/stats.py`). That takes about a millisecond for the whole org and is tested against hand-computed values. On PostgreSQL, `percentile_cont` would be an option.

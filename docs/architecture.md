@@ -12,7 +12,7 @@ flowchart LR
     SEED[seed script] --> DB
 ```
 
-The frontend is a thin client. It holds no business rules beyond form validation that mirrors the API. Every aggregate, conversion, and permission check happens in the backend so it can be unit tested without a browser.
+The frontend is a thin client. It holds no business rules: forms send what the user typed and show the API's field errors next to each input. Every aggregate, conversion, and permission check happens in the backend so it can be unit tested without a browser.
 
 ## Backend layers
 
@@ -76,7 +76,7 @@ erDiagram
 
 Key points:
 
-- **Current salary is derived.** `employees` has no salary column. The current salary is the `salary_events` row with the latest `effective_date` on or before today. A covering index on `(employee_id, effective_date DESC)` makes this a cheap lookup, and the list endpoint resolves it with a single correlated subquery.
+- **Current salary is derived.** `employees` has no salary column. The current salary is the `salary_events` row with the latest `effective_date` on or before today. An index on `(employee_id, effective_date)` makes this one index seek per employee. The list endpoint pages employee IDs first, then resolves current salary for just that page (see performance.md).
 - **Money is integers.** `annual_amount_minor` is in the currency's minor unit (cents, pence, or whole yen). The currency's exponent comes from a small ISO 4217 table in `domain/money.py`.
 - **Rates are strings.** `rate_to_usd` is stored as a decimal string and parsed with `Decimal`. Floats never touch money.
 - **Everything tenant-owned carries `organization_id`.** Repositories take the organization from the authenticated user, never from the request body.
@@ -95,10 +95,10 @@ Key points:
 | Layer | How | Why |
 |---|---|---|
 | `domain` | Plain pytest, no fixtures | Fast, exhaustive edge cases on money, dates, validation |
-| `services` + `repositories` | In-memory SQLite per test, injected clock | Deterministic, no shared state |
+| `services` + `repositories` | Exercised through the API tests and the seed tests, in-memory SQLite per test, injected clock | Deterministic, no shared state |
 | `api` | FastAPI `TestClient` against in-memory SQLite | Verifies auth, roles, status codes, response shape |
 | Analytics | Small hand-built fixture with known answers | Percentiles and conversions verified against values computed by hand |
-| Frontend | Component tests for forms and table state | Rendering logic only; rules live in the API |
+| Frontend | Vitest: formatting, URL state, API error mapping, data loading, table and import components | Rendering logic only; rules live in the API |
 | End to end | Playwright walkthrough (`apps/web/e2e/walkthrough.mjs`) against a production build and the real API | Proves the screens work together; also records the demo video and screenshots |
 
 The clock is injected everywhere a date matters, so "current salary" and "active today" never depend on the wall clock.

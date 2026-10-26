@@ -51,3 +51,16 @@ Replace the spreadsheets with a web application where the HR manager can maintai
 - The dashboard answers "median salary by country in USD" without exporting anything.
 - A 10,000-row CSV import either succeeds completely or reports every bad row.
 - The test suite runs in seconds with no network and no real clock.
+
+## Note added after the build (26 Oct 2026)
+
+This page was written before any code and is kept as written. Where the build differs:
+
+- **Percentiles are computed in Python, not SQL.** Salaries must be converted to USD per
+  currency first, and SQLite has no percentile function. Filtering, sorting, paging and
+  counting still run in SQL. See [performance.md](performance.md).
+- **Audit data.** Salary changes record who made them and when. Edits to employee details
+  record when (`updated_at`, `version`) but not who. An audit screen would need an
+  `updated_by` column for those.
+- **Decisions made while building** are recorded as ADR 008 (payroll run rules: no
+  proration, one run per month) and ADR 009 (CSV import creates new hires only).

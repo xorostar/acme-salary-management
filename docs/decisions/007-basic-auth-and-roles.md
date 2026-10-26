@@ -9,7 +9,7 @@ Salary data is sensitive. The brief names one persona, but shipping an open endp
 ## Decision
 
 - Email and password login. Passwords hashed with `bcrypt`.
-- On login the API issues a signed JWT (HS256, 12-hour expiry) carrying `user_id`, `organization_id`, and `role`. The frontend stores it in memory and an `httpOnly`-less cookie is deliberately not used, to keep the API stateless and the frontend simple.
+- On login the API issues a signed JWT (HS256, 12-hour expiry) carrying `user_id`, `organization_id`, and `role`. The frontend keeps it in `sessionStorage` and sends it as a Bearer header. No cookies are used, which keeps the API stateless and avoids CSRF handling.
 - Two roles:
   - `hr_admin`: everything, including create/edit employees, salary changes, CSV import, payroll runs.
   - `hr_viewer`: read-only on directory, history, analytics, and export.
@@ -25,5 +25,5 @@ Salary data is sensitive. The brief names one persona, but shipping an open endp
 ## Trade-offs accepted
 
 - No refresh tokens or revocation. A leaked token is valid until expiry. Acceptable for the scope, documented as the first thing to harden.
-- Token in frontend memory means a page refresh requires re-login. Mitigated by storing it in `sessionStorage` for the demo, with the trade-off noted in the frontend README.
+- `sessionStorage` is readable by JavaScript, so an XSS bug could leak a token. An `httpOnly` cookie would avoid that but needs CSRF protection. For an internal tool with no user-generated HTML, `sessionStorage` was the simpler choice. The token survives a reload but not a closed tab.
 - No rate limiting on login.

@@ -32,7 +32,7 @@ The **current salary** is the event with the greatest `effective_date` that is o
 
 - Append-only data is trivially auditable and never loses information.
 - Deriving "current" from a reference date makes the logic testable without a real clock and makes historical questions free.
-- The index `(employee_id, effective_date DESC)` keeps the "latest on or before date" lookup O(log n) per employee.
+- The index on `(employee_id, effective_date)` makes the "latest on or before date" lookup one index seek per employee.
 
 ## Trade-offs accepted
 
