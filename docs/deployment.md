@@ -1,118 +1,99 @@
 # Deployment
 
-Two pieces, deployed separately (ADR 005):
+The live demo runs on two free services:
 
-| Piece | Where | Why |
+| Piece | Where | Config |
 |---|---|---|
-| API (`apps/api`) | Fly.io, one machine, SQLite on a persistent volume | Docker image already verified locally; volume keeps data across restarts |
-| Web (`apps/web`) | Vercel | Native Next.js host; one environment variable |
-
-The container migrates and seeds on first boot, so a fresh deploy comes up with the 10,000
-employee demo organization and the two demo logins. A restart skips seeding.
-
-## Recommendation and reasoning
+| API (`apps/api`) | Render free web service, Docker | [`render.yaml`](../render.yaml) |
+| Web (`apps/web`) | Vercel Hobby | Root directory `apps/web`, one environment variable |
 
 ```mermaid
 flowchart LR
-    R[Reviewer's browser] -->|HTTPS| V[Vercel<br/>Next.js web app<br/>CDN, free Hobby plan]
-    R -->|HTTPS JSON + Bearer token| F[Fly.io machine<br/>Docker: FastAPI + uvicorn]
-    F --> D[(Fly volume /data<br/>SQLite acme.db)]
+    R[Reviewer's browser] -->|HTTPS| V[Vercel<br/>Next.js web app]
+    R -->|HTTPS JSON + Bearer token| A[Render free web service<br/>Docker: FastAPI + uvicorn]
+    A --> D[(SQLite file inside the container<br/>re-seeded on every boot)]
 ```
 
-**What actually has to run**
+## Why these two
 
-| Component | Needs | Recommended | Rough cost |
-|---|---|---|---|
-| Web (Next.js) | A Node/Next host with a CDN | **Vercel**, made by the Next.js team, deploys from GitHub on every push | Free (Hobby) |
-| API (FastAPI) | Runs a Docker container 24/7 | **Fly.io**, one `shared-cpu-1x`, 512 MB machine | A few dollars a month (needs a card on file; check current pricing) |
-| Database (SQLite) | A **persistent disk** attached to the one API machine | **Fly volume**, 1 GB | Cents a month |
-| Secrets | JWT secret, demo password, allowed origin | `fly secrets` and Vercel env vars | Free |
+- **Free, no card.** Both have free plans that run this app without payment details.
+- **Vercel** is made by the Next.js team. It needs only the root folder and the API URL.
+- **Render** builds the API's existing Dockerfile unchanged, so production runs the same
+  image that was tested locally.
 
-**Why this pair**
+## What the free API plan means
 
-- SQLite (ADR 005) needs a real disk and exactly one writer. Fly gives a volume pinned to one
-  machine, which fits that exactly. Most free hosts have ephemeral disks: the data would
-  reset on every restart, and reviewers might see edits vanish mid-review.
-- The API is already a verified Docker image, so Fly runs exactly what was tested locally.
-- Vercel needs no configuration for Next.js beyond the root folder and one variable.
-- No managed database to provision or pay for. One file holds all the data, and backup is
-  copying that file.
+| Limit | Effect | Why it is acceptable |
+|---|---|---|
+| No persistent disk | The SQLite file is lost on redeploy, restart or sleep. | The container migrates and seeds 10,000 employees on every boot, so it always starts from clean demo data. Reviewers' edits do not survive a restart. |
+| Sleeps after 15 minutes idle | The first request after a sleep waits about a minute. | A free uptime monitor calling `/health` every 10 minutes keeps it awake. One service running all month fits in the 750 free hours. |
+| Small CPU share | Requests that take under 100 ms locally may take about a second. | Fine for a demo. |
 
-**Settings that matter for reviewers**
+For lasting data, the same Dockerfile runs on a paid plan with a disk. The Render
+Starter plan or Fly.io with a volume both work; set `ACME_DATABASE_URL` to a file on the
+mounted disk. ADR 005 explains why SQLite on one machine fits this workload.
 
-- `min_machines_running = 1` in `fly.toml` keeps the API warm. Without it, the first request
-  after idle waits a few seconds for the machine to boot. You can set it back to 0 after the
-  review to save money.
-- `primary_region`: `lhr` (London) is the default here. Pick the region closest to the
-  reviewers, e.g. `iad` for the US east coast or `sin` for Singapore, before first deploy. A
-  volume cannot move regions.
-- **Two settings must match exactly.** `NEXT_PUBLIC_API_URL` on Vercel must equal the Fly URL.
-  `ACME_CORS_ORIGINS` on Fly must equal the Vercel production URL, with `https://` and no
-  trailing slash. Most "login does nothing" problems are a CORS mismatch. Check the browser
-  console.
-- `NEXT_PUBLIC_API_URL` is baked in at **build** time. After changing it, redeploy on Vercel.
-- Vercel **preview** URLs (per-branch) differ from production and are not in the CORS list.
-  Test on the production URL.
+## 1. API on Render
 
-**Alternatives if you can't use Fly**
+1. Sign in at [render.com](https://render.com) with GitHub and allow access to
+   `acme-salary-management`.
+2. **New → Blueprint**, pick the repository. Render reads `render.yaml` and proposes the
+   `acme-salary-api` service on the Free plan.
+3. When asked for `ACME_CORS_ORIGINS`, enter `["http://localhost:3000"]` for now. It is
+   corrected in step 3 below.
+4. **Apply.** The first build takes a few minutes. When it is live, note the URL, e.g.
+   `https://acme-salary-api.onrender.com`.
+5. Check `https://<api>.onrender.com/health` returns `{"status":"ok"}` and
+   `https://<api>.onrender.com/docs` shows the API.
 
-| Option | Trade-off |
-|---|---|
-| Render web service + persistent disk | Same Dockerfile; the disk needs a paid instance. Free instances sleep and lose data. |
-| Railway with a volume | Same Dockerfile; trial credit, then usage-based. |
-| Any free host without a disk | Works, but re-seeds on every restart. Say so in the README. |
-| Everything on one VPS (Docker Compose) | Cheapest long term, but you manage TLS and updates. Not worth it for an assessment. |
-
-## 1. API on Fly.io
-
-```bash
-# once
-curl -L https://fly.io/install.sh | sh      # Windows: iwr https://fly.io/install.ps1 -useb | iex
-fly auth signup                             # or: fly auth login
-
-cd apps/api
-# edit fly.toml: set `app` to a unique name, e.g. acme-salary-api-<you>
-fly launch --copy-config --no-deploy
-fly volumes create acme_data --size 1 --region lhr
-fly secrets set \
-  ACME_JWT_SECRET="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')" \
-  ACME_DEMO_PASSWORD="acme-demo-2026"
-fly deploy
-curl https://<app>.fly.dev/health           # {"status":"ok"}
-```
-
-The API refuses to start in production without a real `ACME_JWT_SECRET` (32+ bytes).
+`ACME_JWT_SECRET` is generated by Render. The API refuses to start in production without
+a secret of at least 32 bytes.
 
 ## 2. Web on Vercel
 
-1. Push the repository to GitHub.
-2. In Vercel: **Add New → Project → Import** the repository.
+1. Sign in at [vercel.com](https://vercel.com) with GitHub.
+2. **Add New → Project**, import `acme-salary-management`.
 3. **Root Directory:** `apps/web`. Framework preset: Next.js (detected).
-4. **Environment variable:** `NEXT_PUBLIC_API_URL = https://<app>.fly.dev`
-5. Deploy. Note the URL, e.g. `https://acme-salaries.vercel.app`.
+4. **Environment variable:** `NEXT_PUBLIC_API_URL` = the Render URL from step 1, with no
+   trailing slash.
+5. **Deploy**, and note the production URL, e.g. `https://acme-salary-management.vercel.app`.
 
-## 3. Allow the web origin on the API
+## 3. Connect them
 
-```bash
-cd apps/api
-fly secrets set ACME_CORS_ORIGINS='["https://acme-salaries.vercel.app"]'
+In Render, open the service, then **Environment**, and set:
+
+```
+ACME_CORS_ORIGINS = ["https://acme-salary-management.vercel.app"]
 ```
 
-Setting a secret restarts the machine. Log in at the Vercel URL with the demo accounts in
-the README.
+Use the exact Vercel production URL, with `https://` and no trailing slash. Saving
+redeploys the API.
 
-## Alternatives
+## 4. Keep the API awake (optional, recommended while reviewers are looking)
 
-- **Render / Railway:** both build `apps/api/Dockerfile` as is. Mount a disk at `/data`. On a
-  free plan without a disk, the database re-seeds on every restart. That is acceptable for a
-  demo, but changes will not persist.
-- **Reset the demo data:** `fly ssh console -C "python -m app.seed --reset"`.
+Create a free monitor at [cron-job.org](https://cron-job.org) or
+[UptimeRobot](https://uptimerobot.com) that requests
+`https://<api>.onrender.com/health` every 10 minutes.
+
+## Things that commonly break
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Login does nothing; browser console shows a CORS error | `ACME_CORS_ORIGINS` does not exactly match the Vercel URL | Correct it in Render; it redeploys |
+| The web app still calls the old API URL | `NEXT_PUBLIC_API_URL` is fixed at build time | Change it in Vercel, then **Redeploy** |
+| Works on the production URL but not a preview URL | Preview URLs are not in the CORS list | Test on the production URL |
+| First page load hangs for about a minute | The API was asleep | Normal on the free plan; add the monitor from step 4 |
+| API deploy fails at start with `ACME_JWT_SECRET` | The secret is missing or short | Let Render generate it, or set 32+ random characters |
+
+## Reset the demo data
+
+Any restart re-seeds. In Render, use **Manual Deploy → Restart service**.
 
 ## Checklist after deploying
 
-- [ ] `GET /health` returns ok
-- [ ] Login works for `admin@acme.example` and `viewer@acme.example`
+- [ ] `https://<api>/health` returns ok
+- [ ] Log in at the Vercel URL as `admin@acme.example` and `viewer@acme.example`
 - [ ] Dashboard shows 9,321 active employees
-- [ ] Run the walkthrough against production:
-      `node apps/web/e2e/walkthrough.mjs --web https://<vercel-url>`
-      (it creates test data; run `--reset` seeding afterwards if you want a clean demo)
+- [ ] Run the smoke test in [testing-guide.md](testing-guide.md#15-ten-minute-smoke-test-run-after-every-deploy)
+- [ ] Put both URLs in the table at the top of the README
+- [ ] Restart the API so reviewers start from clean data

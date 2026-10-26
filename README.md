@@ -8,7 +8,7 @@ monthly payroll runs.
 | | |
 |---|---|
 | **Live app** | _add the Vercel URL after deploying (see [docs/deployment.md](docs/deployment.md))_ |
-| **API docs** | _add `https://<api>.fly.dev/docs` after deploying_ |
+| **API docs** | _add `https://<api>.onrender.com/docs` after deploying_ |
 | **Demo video** | [docs/demo/walkthrough.webm](docs/demo/walkthrough.webm), a captioned 1-minute walkthrough |
 | **Demo logins** | `admin@acme.example` (HR admin) · `viewer@acme.example` (read only) · password `acme-demo-2026` |
 
@@ -23,7 +23,7 @@ monthly payroll runs.
 | [docs/decisions/](docs/decisions/) | Nine decision records: framework, money, salary history, tenancy, SQLite, rates, auth, payroll, CSV |
 | [docs/ai-usage.md](docs/ai-usage.md) | How AI tools were used, the prompts, and what was caught and fixed by hand |
 | [docs/performance.md](docs/performance.md) | Measured timings on 10,000 employees and the trade-offs behind them |
-| [docs/deployment.md](docs/deployment.md) | Deploying the API to Fly.io and the web app to Vercel |
+| [docs/deployment.md](docs/deployment.md) | Deploying the API to Render and the web app to Vercel, free |
 | [docs/testing-guide.md](docs/testing-guide.md) | Feature-by-feature manual test script, expected results, smoke test |
 
 ## What the HR manager can do
@@ -54,7 +54,7 @@ monthly payroll runs.
 | Database | SQLite (WAL) with integer money in minor units |
 | Web | Next.js 16 (JavaScript), Tailwind 4, shadcn/ui, Recharts |
 | Tests | pytest (220), Vitest + Testing Library (28), Playwright walkthrough (9 journeys) |
-| Delivery | Docker, Fly.io (API), Vercel (web), GitHub Actions CI |
+| Delivery | Docker, Render (API), Vercel (web), GitHub Actions CI |
 
 ## Run it locally
 

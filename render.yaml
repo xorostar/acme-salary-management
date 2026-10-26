@@ -1,0 +1,22 @@
+# Render Blueprint for the API (free plan). The web app is deployed on Vercel.
+# Render dashboard -> New -> Blueprint -> pick this repository.
+# See docs/deployment.md.
+services:
+  - type: web
+    name: acme-salary-api
+    runtime: docker
+    plan: free
+    rootDir: apps/api
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: ACME_ENVIRONMENT
+        value: production
+      - key: ACME_JWT_SECRET
+        generateValue: true # random secret created by Render on first deploy
+      - key: ACME_DEMO_PASSWORD
+        value: acme-demo-2026
+      - key: ACME_CORS_ORIGINS
+        sync: false # set in the dashboard to the Vercel URL, e.g. ["https://acme-salary-management.vercel.app"]
