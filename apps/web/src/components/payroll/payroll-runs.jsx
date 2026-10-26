@@ -29,7 +29,8 @@ export function PayrollRuns() {
   const router = useRouter();
   const { data: runs, error, reload } = useApi(() => api.payrollRuns(), "runs");
   const [periods] = useState(() => selectablePeriods());
-  const [choice, setChoice] = useState(0);
+  // periods[0] is next month (allowed for preparing ahead); default to this month.
+  const [choice, setChoice] = useState(1);
   const [busy, setBusy] = useState(false);
 
   const existing = new Set((runs ?? []).map((r) => `${r.period_year}-${r.period_month}`));

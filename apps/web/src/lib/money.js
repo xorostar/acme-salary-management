@@ -24,13 +24,13 @@ export function formatMoney(amountMinor, currency, { cents = false } = {}) {
 }
 
 /** "$1.2M" for dashboard tiles and chart axes. */
-export function formatCompact(amountMinor, currency = "USD") {
+export function formatCompact(amountMinor, currency = "USD", digits = 1) {
   if (amountMinor === null || amountMinor === undefined) return "—";
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency,
     notation: "compact",
-    maximumFractionDigits: 1,
+    maximumFractionDigits: digits,
   }).format(toMajor(amountMinor, currency));
 }
 

@@ -45,9 +45,10 @@ export function SalaryHistory({ employee, today }) {
                 axisLine={false}
               />
               <YAxis
-                width={56}
                 domain={["auto", "auto"]}
-                tickFormatter={(v) => formatCompact(v, employee.currency_code)}
+                width={64}
+                tickCount={4}
+                tickFormatter={(v) => formatCompact(v, employee.currency_code, 2)}
                 tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
                 tickLine={false}
                 axisLine={false}
@@ -68,6 +69,7 @@ export function SalaryHistory({ employee, today }) {
                 stroke="var(--chart-1)"
                 strokeWidth={2}
                 dot={{ r: 3 }}
+                isAnimationActive={false}
               />
             </LineChart>
           </ResponsiveContainer>
