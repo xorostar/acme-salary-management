@@ -99,6 +99,7 @@ Key points:
 | `api` | FastAPI `TestClient` against in-memory SQLite | Verifies auth, roles, status codes, response shape |
 | Analytics | Small hand-built fixture with known answers | Percentiles and conversions verified against values computed by hand |
 | Frontend | Component tests for forms and table state | Rendering logic only; rules live in the API |
+| End to end | Playwright walkthrough (`apps/web/e2e/walkthrough.mjs`) against a production build and the real API | Proves the screens work together; also records the demo video and screenshots |
 
 The clock is injected everywhere a date matters, so "current salary" and "active today" never depend on the wall clock.
 
@@ -106,6 +107,7 @@ The clock is injected everywhere a date matters, so "current salary" and "active
 
 - `apps/api` runs on Fly.io with a persistent volume for the SQLite file. One machine is enough for 10,000 rows and a single HR team; SQLite in WAL mode handles concurrent reads with one writer.
 - `apps/web` runs on Vercel and points at the API URL via an environment variable.
-- CI runs backend and frontend tests on every push.
+- CI runs backend lint, tests, a migrations-vs-models check and a Docker build, plus frontend lint, tests and a production build, on every push.
+- Step-by-step instructions: [deployment.md](deployment.md).
 
 See `docs/decisions/` for the reasoning behind each major choice.
