@@ -20,7 +20,7 @@ tell which rows landed.
   run** ("Check file") and enables "Import" only when the file is clean.
 - **Export** produces a superset of the import columns, so an exported file can be edited
   and re-imported under new numbers.
-- Limits: 5 MB, 20,000 rows, UTF-8 (a BOM from Excel is accepted), and at most 500 errors
+- Limits: 4 MB (below the hosting platform's 4.5 MB request limit), 20,000 rows, UTF-8 (a BOM from Excel is accepted), and at most 500 errors
   returned with the total count.
 - Export neutralizes spreadsheet formula injection: a cell starting with `= + - @` is
   prefixed with an apostrophe.

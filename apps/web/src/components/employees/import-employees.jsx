@@ -86,7 +86,7 @@ export function ImportEmployees() {
           <CardHeader>
             <CardTitle>1. Choose a file</CardTitle>
             <CardDescription>
-              UTF-8 CSV with the template&apos;s columns, up to 5 MB. Amounts in major units (85000.00).
+              UTF-8 CSV with the template&apos;s columns, up to 4 MB. Amounts in major units (85000.00).
               Dates as YYYY-MM-DD.
             </CardDescription>
           </CardHeader>

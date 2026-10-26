@@ -8,7 +8,7 @@ monthly payroll runs.
 | | |
 |---|---|
 | **Live app** | _add the Vercel URL after deploying (see [docs/deployment.md](docs/deployment.md))_ |
-| **API docs** | _add `https://<api>.onrender.com/docs` after deploying_ |
+| **API docs** | _add `https://<api>.vercel.app/docs` after deploying_ |
 | **Demo video** | [docs/demo/walkthrough.webm](docs/demo/walkthrough.webm), a captioned 1-minute walkthrough |
 | **Demo logins** | `admin@acme.example` (HR admin) · `viewer@acme.example` (read only) · password `acme-demo-2026` |
 
@@ -23,7 +23,7 @@ monthly payroll runs.
 | [docs/decisions/](docs/decisions/) | Nine decision records: framework, money, salary history, tenancy, SQLite, rates, auth, payroll, CSV |
 | [docs/ai-usage.md](docs/ai-usage.md) | How AI tools were used, the prompts, and what was caught and fixed by hand |
 | [docs/performance.md](docs/performance.md) | Measured timings on 10,000 employees and the trade-offs behind them |
-| [docs/deployment.md](docs/deployment.md) | Deploying the API to Render and the web app to Vercel, free |
+| [docs/deployment.md](docs/deployment.md) | Deploying web and API to Vercel and the database to Neon, free, no card |
 | [docs/testing-guide.md](docs/testing-guide.md) | Feature-by-feature manual test script, expected results, smoke test |
 
 ## What the HR manager can do
@@ -51,10 +51,10 @@ monthly payroll runs.
 | Layer | Choice |
 |---|---|
 | API | Python 3.11, FastAPI, SQLAlchemy 2, Alembic, Pydantic 2 |
-| Database | SQLite (WAL) with integer money in minor units |
+| Database | Postgres (Neon) in production, SQLite locally and in tests; integer money in minor units |
 | Web | Next.js 16 (JavaScript), Tailwind 4, shadcn/ui, Recharts |
-| Tests | pytest (220), Vitest + Testing Library (28), Playwright walkthrough (9 journeys) |
-| Delivery | Docker, Render (API), Vercel (web), GitHub Actions CI |
+| Tests | pytest (225, run on SQLite and Postgres), Vitest + Testing Library (28), Playwright walkthrough (9 journeys) |
+| Delivery | Vercel (web and API), Neon (Postgres), Docker image for any container host, GitHub Actions CI |
 
 ## Run it locally
 
@@ -84,7 +84,8 @@ docker run -p 8000:8000 -e ACME_JWT_SECRET=dev-secret-dev-secret-dev-secret-123 
 ## Tests
 
 ```bash
-cd apps/api && pytest            # 220 tests, a few seconds, in-memory SQLite, fixed clock
+cd apps/api && pytest            # 225 tests, a few seconds, in-memory SQLite, fixed clock
+# same suite on Postgres: ACME_TEST_DATABASE_URL=postgresql://... pytest
 cd apps/web && npm test          # 28 tests, jsdom, no network
 # End-to-end against running servers (see the script header):
 node apps/web/e2e/walkthrough.mjs --web http://localhost:3000

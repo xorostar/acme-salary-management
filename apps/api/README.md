@@ -38,7 +38,7 @@ Environment variables, all prefixed `ACME_` (a `.env` file is also read):
 | Variable | Default | Purpose |
 |---|---|---|
 | `ACME_ENVIRONMENT` | `development` | `production` refuses to start without a real JWT secret |
-| `ACME_DATABASE_URL` | `sqlite:///./acme.db` | SQLAlchemy URL |
+| `ACME_DATABASE_URL` | `sqlite:///./acme.db` | SQLAlchemy URL. A plain `postgresql://…` URL (as Neon gives it) is accepted and uses psycopg 3. |
 | `ACME_JWT_SECRET` | `change-me-in-production` | HS256 signing key, 32+ bytes in production |
 | `ACME_JWT_EXPIRY_HOURS` | `12` | Token lifetime |
 | `ACME_CORS_ORIGINS` | `["http://localhost:3000"]` | Allowed frontend origins (JSON list) |
@@ -61,6 +61,7 @@ Every write requires `hr_admin`; reads accept either role.
 
 ```bash
 pytest                          # in-memory SQLite, fixed clock, no network
+ACME_TEST_DATABASE_URL=postgresql://user:pass@localhost/acme_test pytest   # same suite on Postgres
 ruff check app tests scripts
 ruff format --check app tests scripts
 alembic check                   # models and migrations agree

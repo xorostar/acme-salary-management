@@ -105,7 +105,7 @@ The clock is injected everywhere a date matters, so "current salary" and "active
 
 ## Deployment
 
-- `apps/api` runs as a Docker container on Render's free plan. The free plan has no persistent disk, so the container re-seeds the demo data on every boot (see ADR 005). One machine is enough for 10,000 rows and a single HR team; SQLite in WAL mode handles concurrent reads with one writer.
+- `apps/api` runs as a Python function on Vercel (`apps/api/index.py`) against a Neon Postgres database, both on free plans. A serverless function cannot keep a SQLite file, so production uses Postgres; locally, in tests and in the Docker image the default is still SQLite (ADR 005). CI runs the API suite on both.
 - `apps/web` runs on Vercel and points at the API URL via an environment variable.
 - CI runs backend lint, tests, a migrations-vs-models check and a Docker build, plus frontend lint, tests and a production build, on every push.
 - Step-by-step instructions: [deployment.md](deployment.md).

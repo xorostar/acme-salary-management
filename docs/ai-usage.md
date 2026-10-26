@@ -80,6 +80,8 @@ missing. It also found an import-time crash in uncommitted code.
 | shadcn/ui's current style uses Base UI, not Radix, so the Select needs a label map. | Read the generated component source before use. | Native `<select>` for filters and forms, which is simpler, accessible, and testable. |
 | A walkthrough assertion matched hidden text from a previous page. Next 16 keeps visited routes mounted. | Playwright strict-mode error. | Exact matching in the test. Not an app bug. |
 | A shell heredoc mangled `\n` escapes in a test file. | Lint reported a syntax error. | Edited with the file tool instead. |
+| Sorting the directory by salary compared raw amounts across currencies, so 11.5M INR ranked above 300k USD. Unit tests passed because each used one currency. | A manual check on Postgres before deploying looked at the top salaries. | Sort by USD equivalent at the planning rate; a test with INR, JPY and USD pins it. |
+| Free-hosting assumptions were wrong: Fly.io had dropped its free plan, and Render asked for a card. | Trying to deploy. | Moved production to Vercel + Neon Postgres. The SQLAlchemy layer made it a small change; CI now runs the suite on both databases. |
 
 ## What the AI was not trusted with
 

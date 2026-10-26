@@ -25,9 +25,19 @@ SQLite everywhere: in-memory for tests, a file for local development, and a file
 
 ## Update, 26 Oct 2026: hosting the demo for free
 
-Fly.io no longer offers a free plan to new accounts, and the demo should cost nothing. The
-API is deployed to Render's free plan instead, from the same Dockerfile. That plan has no
-persistent disk, so the SQLite file lives inside the container and is re-created from the
-seed on every boot. For a public demo this is a feature: every reviewer starts from the
-same clean data. For real use, the same image runs with a disk attached (Render paid plan
-or Fly.io with a volume, `fly.toml` is kept for that) and nothing else changes.
+The demo must cost nothing and need no payment card. Fly.io no longer has a free plan,
+and Render asked for a card even on its free plan. The only no-card option that keeps
+data was serverless: the API runs as a Python function on Vercel, and a serverless
+function cannot keep a SQLite file. Production therefore uses **Postgres on Neon's free
+plan**.
+
+What changed, and what did not:
+
+- The decision's escape hatch held: SQLAlchemy is the only database interface, so moving
+  was a connection string plus three portability fixes, each now covered by tests.
+  Salary sorting states `NULLS LAST` explicitly (the two databases disagree by default).
+  Payroll totals cast `SUM` back to an integer (Postgres returns `NUMERIC`). The seed lets
+  the database assign IDs, so Postgres sequences stay correct.
+- The whole API suite runs against Postgres in CI as well as SQLite.
+- SQLite stays the default for local development, tests and the Docker image, for the
+  reasons above.
