@@ -1,7 +1,7 @@
-"""Load the generated organization into a database.
+"""Load the generated organization into a database (SQLite or Postgres).
 
-Inserts go through SQLAlchemy Core in batches with explicit ids, which loads
-10,000 employees and ~40,000 salary events in a few seconds on SQLite.
+Inserts go through SQLAlchemy Core in batches, which loads 10,000 employees and
+~43,000 salary events in about two seconds on SQLite.
 """
 
 from dataclasses import dataclass
@@ -90,42 +90,48 @@ def seed_database(
     session.execute(insert(ExchangeRate), rate_rows)
 
     people = generate_employees(count, seed=seed, anchor=ANCHOR_DATE)
-    emp_rows: list[dict] = []
-    event_rows: list[dict] = []
-    for emp_id, p in enumerate(people, start=1):
-        emp_rows.append(
-            {
-                "id": emp_id,
-                "organization_id": org.id,
-                "employee_number": p.employee_number,
-                "first_name": p.first_name,
-                "last_name": p.last_name,
-                "email": p.email,
-                "country_code": p.country_code,
-                "currency_code": p.currency_code,
-                "department": p.department,
-                "job_title": p.job_title,
-                "level": p.level,
-                "hire_date": p.hire_date,
-                "termination_date": p.termination_date,
-                "version": 1,
-            }
-        )
-        for e in p.salary_events:
-            event_rows.append(
-                {
-                    "organization_id": org.id,
-                    "employee_id": emp_id,
-                    "annual_amount_minor": e.annual_amount_minor,
-                    "currency_code": p.currency_code,
-                    "effective_date": e.effective_date,
-                    "reason": e.reason,
-                    "created_by_user_id": None,
-                }
-            )
-
+    emp_rows = [
+        {
+            "organization_id": org.id,
+            "employee_number": p.employee_number,
+            "first_name": p.first_name,
+            "last_name": p.last_name,
+            "email": p.email,
+            "country_code": p.country_code,
+            "currency_code": p.currency_code,
+            "department": p.department,
+            "job_title": p.job_title,
+            "level": p.level,
+            "hire_date": p.hire_date,
+            "termination_date": p.termination_date,
+            "version": 1,
+        }
+        for p in people
+    ]
+    # Let the database assign ids and hand them back in input order. Inserting
+    # explicit ids would leave a Postgres sequence at 1, so the next employee
+    # created through the API would collide with an existing id.
+    ids: list[int] = []
     for i in range(0, len(emp_rows), BATCH):
-        session.execute(insert(Employee), emp_rows[i : i + BATCH])
+        ids.extend(
+            session.scalars(
+                insert(Employee).returning(Employee.id, sort_by_parameter_order=True),
+                emp_rows[i : i + BATCH],
+            )
+        )
+    event_rows = [
+        {
+            "organization_id": org.id,
+            "employee_id": emp_id,
+            "annual_amount_minor": e.annual_amount_minor,
+            "currency_code": p.currency_code,
+            "effective_date": e.effective_date,
+            "reason": e.reason,
+            "created_by_user_id": None,
+        }
+        for emp_id, p in zip(ids, people, strict=True)
+        for e in p.salary_events
+    ]
     for i in range(0, len(event_rows), BATCH):
         session.execute(insert(SalaryEvent), event_rows[i : i + BATCH])
     session.commit()

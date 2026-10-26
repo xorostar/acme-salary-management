@@ -8,7 +8,7 @@ from datetime import date
 import pytest
 
 from app.models import Organization, SalaryEvent
-from tests.factories import make_employee, make_org
+from tests.factories import make_employee, make_org, make_rate
 
 
 @pytest.fixture
@@ -339,3 +339,30 @@ def test_reference_lists_countries_with_currency(client, viewer_headers):
     jp = next(c for c in body["countries"] if c["code"] == "JP")
     assert jp["currency_code"] == "JPY"
     assert "Engineering" in body["departments"]
+
+
+def test_salary_sort_compares_currencies_in_usd(client, session, org, viewer_headers):
+    make_rate(session, "INR", "0.0114")
+    make_rate(session, "JPY", "0.0067")
+    # Raw amounts: INR 11.5M and JPY 9M dwarf USD 300k, but in USD they are
+    # about 131k and 60k, so the American is the highest paid.
+    make_employee(session, org, last_name="India", country_code="IN", currency_code="INR",
+                  salary=1_150_000_000)  # fmt: skip
+    make_employee(session, org, last_name="Japan", country_code="JP", currency_code="JPY",
+                  salary=9_000_000)  # fmt: skip
+    make_employee(session, org, last_name="States", salary=30_000_000)
+    session.commit()
+
+    r = client.get("/employees?sort=current_salary&order=desc", headers=viewer_headers)
+
+    assert [e["last_name"] for e in r.json()["items"]] == ["States", "India", "Japan"]
+
+
+def test_employee_without_salary_sorts_last_both_ways(client, session, org, viewer_headers):
+    make_employee(session, org, last_name="Paid", salary=5_000_000)
+    make_employee(session, org, last_name="Unpaid", salary=None)
+    session.commit()
+
+    for order in ("asc", "desc"):
+        r = client.get(f"/employees?sort=current_salary&order={order}", headers=viewer_headers)
+        assert [e["last_name"] for e in r.json()["items"]] == ["Paid", "Unpaid"]

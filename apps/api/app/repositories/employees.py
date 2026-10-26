@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Literal
 
-from sqlalchemy import Select, and_, func, or_, select
+from sqlalchemy import Select, and_, case, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.domain.analytics import PayRecord
@@ -62,6 +62,28 @@ def current_effective_date_subquery(as_of: date):
 
 def active_condition(as_of: date):
     return or_(Employee.termination_date.is_(None), Employee.termination_date > as_of)
+
+
+def salary_sort_key(as_of: date, usd_factors: dict[str, float] | None):
+    """Current salary in approximate US cents, so sorting compares people paid
+    in different currencies fairly (11.5M INR is not more than 300k USD).
+    Without rates it falls back to the raw amount."""
+    amount = current_salary_subquery(as_of)
+    if not usd_factors:
+        return amount
+    return case(
+        *(
+            (Employee.currency_code == code, amount * factor)
+            for code, factor in usd_factors.items()
+        ),
+        else_=None,
+    )
+
+
+def _direction(column, descending: bool):
+    """Explicit NULLS LAST: SQLite and Postgres disagree on where NULLs sort by
+    default, and someone without a salary yet should never top the list."""
+    return (column.desc() if descending else column.asc()).nulls_last()
 
 
 def apply_filters(stmt: Select, org_id: int, filters: EmployeeFilters, as_of: date) -> Select:
@@ -159,16 +181,17 @@ class EmployeeRepository:
         page_size: int,
         sort: SortField = "last_name",
         descending: bool = False,
+        usd_factors: dict[str, float] | None = None,
     ) -> list[EmployeeRow]:
         # Two phases (a "deferred join"): pick the page of ids using only
         # employee columns, then fetch rows and current salary for those ids.
         # The correlated salary subqueries then run 25 times, not once per
         # row skipped by OFFSET. Sorting by salary needs the subquery in phase 1.
         if sort == "current_salary":
-            order_col = current_salary_subquery(as_of)
+            order_col = salary_sort_key(as_of, usd_factors)
         else:
             order_col = getattr(Employee, sort)
-        order = order_col.desc() if descending else order_col.asc()
+        order = _direction(order_col, descending)
         id_stmt = (
             apply_filters(select(Employee.id), org_id, filters, as_of)
             .order_by(order, Employee.id.asc())  # tie-break on id so paging is stable
@@ -197,13 +220,17 @@ class EmployeeRepository:
         *,
         sort: SortField = "last_name",
         descending: bool = False,
+        usd_factors: dict[str, float] | None = None,
     ) -> list[EmployeeRow]:
         """Every matching employee with current salary, for CSV export."""
         amount = current_salary_subquery(as_of).label("current_amount")
         effective = current_effective_date_subquery(as_of).label("current_effective")
-        order_col = amount if sort == "current_salary" else getattr(Employee, sort)
+        if sort == "current_salary":
+            order_col = salary_sort_key(as_of, usd_factors)
+        else:
+            order_col = getattr(Employee, sort)
         stmt = apply_filters(select(Employee, amount, effective), org_id, filters, as_of).order_by(
-            order_col.desc() if descending else order_col.asc(), Employee.id.asc()
+            _direction(order_col, descending), Employee.id.asc()
         )
         return [EmployeeRow(e, a, d) for e, a, d in self.session.execute(stmt)]
 

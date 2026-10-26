@@ -98,6 +98,15 @@ class RateConverter:
         return rounded if amount_minor >= 0 else -rounded
 
 
+def usd_sort_factor(currency_code: str, rate_to_usd: Decimal) -> float:
+    """Multiplier from one minor unit of `currency_code` to US cents.
+
+    For ORDERING only (e.g. "highest paid first" across currencies), where a
+    float is fine because no amount is ever shown or stored from it.
+    """
+    return float(rate_to_usd) * 10 ** (2 - exponent(currency_code))
+
+
 def monthly_from_annual(annual_minor: int) -> int:
     """One twelfth of an annual amount, rounded half-up to a whole minor unit."""
     return _round_half_up(Decimal(annual_minor) / Decimal(12))

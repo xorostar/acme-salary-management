@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from datetime import date
 
-from sqlalchemy import func, insert, select
+from sqlalchemy import BigInteger, cast, func, insert, select
 from sqlalchemy.orm import Session
 
 from app.domain.payroll import Line, PayrollInput
@@ -87,8 +87,8 @@ class PayrollRepository:
                 PayrollLine.country_code,
                 PayrollLine.currency_code,
                 func.count(PayrollLine.id),
-                func.sum(PayrollLine.amount_minor),
-                func.sum(PayrollLine.amount_usd_minor),
+                cast(func.sum(PayrollLine.amount_minor), BigInteger),
+                cast(func.sum(PayrollLine.amount_usd_minor), BigInteger),
             )
             .where(PayrollLine.payroll_run_id == run_id)
             .group_by(PayrollLine.country_code, PayrollLine.currency_code)

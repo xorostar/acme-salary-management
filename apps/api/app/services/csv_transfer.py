@@ -13,6 +13,7 @@ from app.domain.money import to_major
 from app.models import Employee, SalaryEvent
 from app.repositories.employees import EmployeeFilters, EmployeeRepository, SortField
 from app.services.auth import CurrentUser
+from app.services.employees import usd_sort_factors
 
 HIRE_REASON = "Hire"
 
@@ -78,7 +79,12 @@ class CsvTransferService:
         self, filters: EmployeeFilters, *, sort: SortField, descending: bool
     ) -> Iterator[str]:
         rows = self.employees.export_rows(
-            self.user.organization_id, filters, self.today, sort=sort, descending=descending
+            self.user.organization_id,
+            filters,
+            self.today,
+            sort=sort,
+            descending=descending,
+            usd_factors=usd_sort_factors(self.session, self.today),
         )
 
         def cells():

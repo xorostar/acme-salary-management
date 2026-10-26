@@ -3,7 +3,7 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import model_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 DEFAULT_JWT_SECRET = "change-me-in-production"
@@ -18,6 +18,16 @@ class Settings(BaseSettings):
     jwt_secret: str = DEFAULT_JWT_SECRET
     jwt_expiry_hours: int = 12
     cors_origins: list[str] = ["http://localhost:3000"]
+
+    @field_validator("database_url")
+    @classmethod
+    def _use_psycopg_driver(cls, url: str) -> str:
+        """Accept the plain postgres:// URL that hosts like Neon hand out and
+        select the psycopg 3 driver that is installed."""
+        for prefix in ("postgres://", "postgresql://"):
+            if url.startswith(prefix):
+                return "postgresql+psycopg://" + url[len(prefix) :]
+        return url
 
     @model_validator(mode="after")
     def _require_real_secret_in_production(self) -> "Settings":

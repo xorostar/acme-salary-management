@@ -3,8 +3,13 @@
 Every test gets a fresh in-memory SQLite database with the schema created from
 the models, a fixed clock (2025-06-15), and a TestClient bound to an app that
 uses both. No test touches the network, the filesystem, or the real date.
+
+Set ACME_TEST_DATABASE_URL to run the same suite against a real Postgres
+(production runs on Postgres): tables are created before and dropped after
+every test.
 """
 
+import os
 from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import date, timedelta
@@ -31,7 +36,7 @@ def fixed_clock() -> date:
 @pytest.fixture
 def settings() -> Settings:
     return Settings(
-        database_url="sqlite://",
+        database_url=os.environ.get("ACME_TEST_DATABASE_URL", "sqlite://"),
         jwt_secret="test-secret-that-is-at-least-32-bytes-long!",
         cors_origins=[],
     )
@@ -40,9 +45,12 @@ def settings() -> Settings:
 @pytest.fixture
 def engine(settings: Settings) -> Iterator[Engine]:
     engine = make_engine(settings.database_url)
+    Base.metadata.drop_all(engine)  # a previous run may have left tables behind
     Base.metadata.create_all(engine)
     yield engine
     engine.dispose()
+    if not engine.url.drivername.startswith("sqlite"):
+        Base.metadata.drop_all(engine)
 
 
 @pytest.fixture

@@ -1,0 +1,8 @@
+tests
+scripts
+Dockerfile
+docker-entrypoint.sh
+.dockerignore
+fly.toml
+*.db
+*.db-*

@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.domain.employee import EmployeeInput, normalize_employee, validate_employee
 from app.domain.errors import ConflictError, FieldError, NotFoundError, ValidationError
-from app.domain.money import to_minor
+from app.domain.money import CURRENCY_EXPONENTS, to_minor, usd_sort_factor
 from app.domain.salary import SalaryPoint, current_salary, validate_salary_event
 from app.models import Employee, SalaryEvent, User
 from app.repositories.employees import (
@@ -15,6 +15,7 @@ from app.repositories.employees import (
     EmployeeRow,
     SortField,
 )
+from app.repositories.exchange_rates import ExchangeRateRepository
 from app.repositories.salary_events import SalaryEventRepository
 from app.services.auth import CurrentUser
 
@@ -33,6 +34,14 @@ def _parse_salary(annual_salary: str, currency_code: str, field: str = "annual_s
         return to_minor(annual_salary, currency_code)
     except ValueError as exc:
         raise ValidationError.single(field, str(exc)) from None
+
+
+def usd_sort_factors(session: Session, today: date) -> dict[str, float]:
+    """Per-currency multipliers to US cents at today's planning rates, used to
+    sort by salary across currencies."""
+    rates = ExchangeRateRepository(session).rates_as_of(today)
+    return {code: usd_sort_factor(code, rate) for code, rate in rates.items()
+            if code in CURRENCY_EXPONENTS}  # fmt: skip
 
 
 class EmployeeService:
@@ -66,6 +75,7 @@ class EmployeeService:
             page_size=page_size,
             sort=sort,
             descending=descending,
+            usd_factors=usd_sort_factors(self.session, self.today),
         )
         return rows, total
 

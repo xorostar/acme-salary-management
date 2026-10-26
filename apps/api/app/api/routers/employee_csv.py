@@ -19,7 +19,8 @@ from app.services.csv_transfer import CsvTransferService
 router = APIRouter(prefix="/employees", tags=["csv"])
 
 AdminDep = Annotated[CurrentUser, Depends(require_role(ROLE_ADMIN))]
-MAX_UPLOAD_BYTES = 5 * 1024 * 1024
+# Below Vercel's 4.5 MB request-body limit, so users get this message, not a 413.
+MAX_UPLOAD_BYTES = 4 * 1024 * 1024
 MAX_ERRORS_RETURNED = 500  # the UI shows a table; the count tells the full story
 
 TEMPLATE_EXAMPLE = [
@@ -91,7 +92,7 @@ def import_csv(
     # work of a large import does not stall the event loop.
     raw = file.file.read(MAX_UPLOAD_BYTES + 1)
     if len(raw) > MAX_UPLOAD_BYTES:
-        raise ValidationError.single("file", "must be at most 5 MB")
+        raise ValidationError.single("file", "must be at most 4 MB")
     try:
         text = raw.decode("utf-8-sig")
     except UnicodeDecodeError:

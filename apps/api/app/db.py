@@ -24,9 +24,24 @@ def _enable_sqlite_pragmas(dbapi_connection, _record) -> None:
 
 
 def make_engine(database_url: str) -> Engine:
-    """Create an engine. In-memory SQLite uses a single shared connection so
-    every session in a test sees the same schema and data."""
+    """Create an engine.
+
+    - In-memory SQLite uses a single shared connection so every session in a
+      test sees the same schema and data.
+    - Postgres (production on Vercel + Neon) uses a small pool with pre-ping, so
+      a connection dropped while a serverless instance was idle is replaced
+      transparently. Prepared statements are disabled because Neon's pooled
+      endpoint (PgBouncer, transaction mode) does not support them.
+    """
     kwargs: dict = {}
+    if database_url.startswith("postgresql"):
+        kwargs.update(
+            pool_size=2,
+            max_overflow=3,
+            pool_pre_ping=True,
+            pool_recycle=300,
+            connect_args={"prepare_threshold": None},
+        )
     if database_url.startswith("sqlite"):
         kwargs["connect_args"] = {"check_same_thread": False}
         if ":memory:" in database_url or database_url.endswith("sqlite://"):
