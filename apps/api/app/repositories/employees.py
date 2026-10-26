@@ -123,20 +123,22 @@ class EmployeeRepository:
         return self.session.scalars(stmt).first() is not None
 
     def existing_numbers(self, org_id: int, numbers: list[str]) -> set[str]:
-        if not numbers:
-            return set()
-        stmt = select(Employee.employee_number).where(
-            Employee.organization_id == org_id, Employee.employee_number.in_(numbers)
-        )
-        return set(self.session.scalars(stmt))
+        return self._existing(org_id, Employee.employee_number, numbers)
 
     def existing_emails(self, org_id: int, emails: list[str]) -> set[str]:
-        if not emails:
-            return set()
-        stmt = select(Employee.email).where(
-            Employee.organization_id == org_id, Employee.email.in_(emails)
-        )
-        return set(self.session.scalars(stmt))
+        return self._existing(org_id, Employee.email, emails)
+
+    def _existing(self, org_id: int, column, values: list[str], chunk: int = 500) -> set[str]:
+        """Which of `values` already exist. Chunked to stay under SQLite's
+        bound-parameter limit for 10,000-row imports."""
+        found: set[str] = set()
+        unique = list(dict.fromkeys(values))
+        for i in range(0, len(unique), chunk):
+            stmt = select(column).where(
+                Employee.organization_id == org_id, column.in_(unique[i : i + chunk])
+            )
+            found.update(self.session.scalars(stmt))
+        return found
 
     def add(self, employee: Employee) -> Employee:
         self.session.add(employee)
@@ -186,6 +188,24 @@ class EmployeeRepository:
             )
         }
         return [rows[i] for i in ids]
+
+    def export_rows(
+        self,
+        org_id: int,
+        filters: EmployeeFilters,
+        as_of: date,
+        *,
+        sort: SortField = "last_name",
+        descending: bool = False,
+    ) -> list[EmployeeRow]:
+        """Every matching employee with current salary, for CSV export."""
+        amount = current_salary_subquery(as_of).label("current_amount")
+        effective = current_effective_date_subquery(as_of).label("current_effective")
+        order_col = amount if sort == "current_salary" else getattr(Employee, sort)
+        stmt = apply_filters(select(Employee, amount, effective), org_id, filters, as_of).order_by(
+            order_col.desc() if descending else order_col.asc(), Employee.id.asc()
+        )
+        return [EmployeeRow(e, a, d) for e, a, d in self.session.execute(stmt)]
 
     def current_pay(self, org_id: int, filters: EmployeeFilters, as_of: date) -> list[PayRecord]:
         """Salary in force on `as_of` for every matching employee, as plain records.
