@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.engine import Engine
 
 from app.api.errors import register_error_handlers
-from app.api.routers import auth
+from app.api.routers import auth, employees, reference
 from app.config import Settings, get_settings
 from app.db import make_engine, make_session_factory
 
@@ -44,6 +44,8 @@ def create_app(
 
     register_error_handlers(app)
     app.include_router(auth.router)
+    app.include_router(employees.router)
+    app.include_router(reference.router)
 
     @app.get("/health", tags=["meta"])
     def health() -> dict[str, str]:

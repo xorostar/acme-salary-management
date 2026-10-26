@@ -30,7 +30,11 @@ def fixed_clock() -> date:
 
 @pytest.fixture
 def settings() -> Settings:
-    return Settings(database_url="sqlite://", jwt_secret="test-secret-that-is-at-least-32-bytes-long!", cors_origins=[])
+    return Settings(
+        database_url="sqlite://",
+        jwt_secret="test-secret-that-is-at-least-32-bytes-long!",
+        cors_origins=[],
+    )
 
 
 @pytest.fixture
