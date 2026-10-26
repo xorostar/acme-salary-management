@@ -19,7 +19,7 @@ from app.models import (
     SalaryEvent,
     User,
 )
-from app.security import hash_password
+from app.security import BCRYPT_ROUNDS, hash_password
 from app.seed.generator import (
     ANCHOR_DATE,
     DEFAULT_COUNT,
@@ -60,6 +60,7 @@ def seed_database(
     count: int = DEFAULT_COUNT,
     seed: int = DEFAULT_SEED,
     reset: bool = False,
+    password_rounds: int = BCRYPT_ROUNDS,
 ) -> SeedResult:
     if reset:
         reset_database(session)
@@ -70,7 +71,7 @@ def seed_database(
     session.add(org)
     session.flush()
 
-    password_hash = hash_password(demo_password)
+    password_hash = hash_password(demo_password, rounds=password_rounds)
     session.add_all(
         [
             User(organization_id=org.id, email=DEMO_ADMIN_EMAIL, password_hash=password_hash,

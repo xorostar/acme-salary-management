@@ -111,7 +111,7 @@ def test_job_titles_follow_level():
 
 
 def test_seed_database_loads_everything(session):
-    result = seed_database(session, demo_password="pw", count=50)
+    result = seed_database(session, demo_password="pw", count=50, password_rounds=4)
 
     assert result.employees == 50
     assert session.scalar(select(func.count(Employee.id))) == 50
@@ -121,10 +121,10 @@ def test_seed_database_loads_everything(session):
 
 
 def test_seed_refuses_to_overwrite_without_reset(session):
-    seed_database(session, demo_password="pw", count=5)
+    seed_database(session, demo_password="pw", count=5, password_rounds=4)
 
     with pytest.raises(DatabaseNotEmptyError):
-        seed_database(session, demo_password="pw", count=5)
+        seed_database(session, demo_password="pw", count=5, password_rounds=4)
 
-    seed_database(session, demo_password="pw", count=7, reset=True)
+    seed_database(session, demo_password="pw", count=7, reset=True, password_rounds=4)
     assert session.scalar(select(func.count(Employee.id))) == 7

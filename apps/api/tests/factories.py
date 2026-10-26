@@ -8,9 +8,9 @@ from app.domain.reference import ROLE_ADMIN, ROLE_VIEWER
 from app.models import Employee, ExchangeRate, Organization, SalaryEvent, User
 from app.security import hash_password
 
-# bcrypt is slow by design; hash the shared test password once per process.
+# bcrypt is slow by design; hash the shared test password once, at minimum cost.
 TEST_PASSWORD = "Password123!"
-_TEST_HASH = hash_password(TEST_PASSWORD)
+_TEST_HASH = hash_password(TEST_PASSWORD, rounds=4)
 
 
 def make_org(session: Session, name: str = "ACME", base_currency: str = "USD") -> Organization:
